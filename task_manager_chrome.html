@@ -1,9 +1,3 @@
-<!--
-1.python -m http.server using this comment on a cmd opend on a floder you can start a surver of that floder which allows you to run html files in that folder thourgh server.so that you can connect to wifi and use saparate chorme memory
-after running this in cmd got to chrome and type http://localhost:8000/file_name.html
-for LAN:python -m http.server 8000 --bind 0.0.0.0 and then http://192.168.29.100:8000/file_name.html
-2.chrome gives a little bit of memory to store website data which is enough for text storing.see the example of task manager single file
--->
 <!DOCTYPE html>
 <html lang="en">
 
@@ -1495,6 +1489,13 @@ initDB();
 const getDB = () => JSON.parse(localStorage.getItem(DB_KEY));
 const saveDB = (db) => localStorage.setItem(DB_KEY, JSON.stringify(db));
 
+const hashPassword = async (password) => {
+    const msgBuffer = new TextEncoder().encode(password);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+};
+
 const originalFetch = window.fetch;
 window.fetch = async (url, options = {}) => {
     const db = getDB();
@@ -1521,13 +1522,20 @@ window.fetch = async (url, options = {}) => {
     }
     if (url === '/api/auth/login') {
         const u = bodyObj.username.toLowerCase();
-        const p = bodyObj.password;
+        const p = await hashPassword(bodyObj.password);
         if (!db.users[u]) {
             // New user registration
             db.users[u] = { password: p, settings: { morning_notify: true }, tasks: [], progress: [], non_daily_tasks: [], nextTaskId: 1, nextProgressId: 1, nextNdId: 1 };
             saveDB(db);
-        } else if (db.users[u].password !== p) {
-            return jsonRes({ error: 'Invalid credentials. If you are trying to create a new account, this password is already in use!' }, 401);
+        } else {
+            // Check if existing password is plain text (not 64 chars long or matches input directly)
+            if (db.users[u].password !== p && db.users[u].password === bodyObj.password) {
+                // Upgrade to hashed password
+                db.users[u].password = p;
+                saveDB(db);
+            } else if (db.users[u].password !== p) {
+                return jsonRes({ error: 'Invalid credentials. If you are trying to create a new account, this password is already in use!' }, 401);
+            }
         }
         sessionStorage.setItem('currentUser', u);
         return jsonRes({ success: true, username: u });
@@ -1632,7 +1640,7 @@ window.fetch = async (url, options = {}) => {
     }
     
     if (url === '/api/account/password' && method === 'POST') {
-        user.password = bodyObj.password;
+        user.password = await hashPassword(bodyObj.password);
         saveDB(db);
         return jsonRes({ success: true });
     }
