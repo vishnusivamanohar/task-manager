@@ -1,3 +1,6 @@
+<!--
+This uses chorme storage to store the data
+-->
 <!DOCTYPE html>
 <html lang="en">
 
@@ -1362,9 +1365,9 @@
                     <div class="form-group">
                         <label style="display: flex; justify-content: space-between; align-items: center;">
                             <span>End Date</span>
-                            <span id="btn-end-tomorrow"
-                                style="font-size: 0.75rem; color: var(--primary-color); cursor: pointer; font-weight: 600;">Set
-                                Tomorrow</span>
+                            <span id="btn-end-sameday"
+                                style="font-size: 0.75rem; color: var(--primary-color); cursor: pointer; font-weight: 600;">Same
+                                Day</span>
                         </label>
                         <input type="date" id="task-end" class="form-control">
                     </div>
@@ -1978,10 +1981,11 @@
                 document.getElementById('task-start').value = getLocalYYYYMMDD(tomorrow);
             });
 
-            document.getElementById('btn-end-tomorrow').addEventListener('click', () => {
-                const tomorrow = new Date();
-                tomorrow.setDate(tomorrow.getDate() + 1);
-                document.getElementById('task-end').value = getLocalYYYYMMDD(tomorrow);
+            document.getElementById('btn-end-sameday').addEventListener('click', () => {
+                const startVal = document.getElementById('task-start').value;
+                if (startVal) {
+                    document.getElementById('task-end').value = startVal;
+                }
             });
 
             addNdBtn.addEventListener('click', () => {
