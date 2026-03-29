@@ -1,6 +1,4 @@
-<!--
-This uses chorme storage to store the data
--->
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -1971,14 +1969,26 @@ This uses chorme storage to store the data
                 document.getElementById('modal-title').textContent = 'Add New Task';
                 taskForm.reset();
                 document.getElementById('task-id').value = '';
-                document.getElementById('task-start').value = getLocalYYYYMMDD(new Date());
+                const todayStr = getLocalYYYYMMDD(new Date());
+                document.getElementById('task-start').value = todayStr;
+                document.getElementById('task-start').min = todayStr;
+                document.getElementById('task-end').min = todayStr;
                 openModal(taskModal);
             });
 
             document.getElementById('btn-tomorrow').addEventListener('click', () => {
                 const tomorrow = new Date();
                 tomorrow.setDate(tomorrow.getDate() + 1);
-                document.getElementById('task-start').value = getLocalYYYYMMDD(tomorrow);
+                const tmrwStr = getLocalYYYYMMDD(tomorrow);
+                document.getElementById('task-start').value = tmrwStr;
+                document.getElementById('task-end').min = tmrwStr;
+            });
+
+            document.getElementById('task-start').addEventListener('change', (e) => {
+                const startVal = e.target.value;
+                if (startVal) {
+                    document.getElementById('task-end').min = startVal;
+                }
             });
 
             document.getElementById('btn-end-sameday').addEventListener('click', () => {
@@ -2363,6 +2373,18 @@ This uses chorme storage to store the data
                         return rDate ? `${rDate}T${rTime}` : rTime;
                     })()
                 };
+
+                if (taskData.end_date && taskData.start_date > taskData.end_date) {
+                    showToast('End date cannot be before start date!', 'error');
+                    return;
+                }
+
+                const todayStr = getLocalYYYYMMDD(new Date());
+                if (!id && taskData.start_date < todayStr) {
+                    showToast('New tasks cannot start in the past!', 'error');
+                    return;
+                }
+
                 const url = id ? `/update/${id}` : '/add';
 
                 try {
@@ -2425,6 +2447,12 @@ This uses chorme storage to store the data
                     document.getElementById('task-desc').value = task.description || '';
                     document.getElementById('task-start').value = task.start_date;
                     document.getElementById('task-end').value = task.end_date || '';
+                    document.getElementById('task-start').removeAttribute('min');
+                    if (task.start_date) {
+                        document.getElementById('task-end').min = task.start_date;
+                    } else {
+                        document.getElementById('task-end').removeAttribute('min');
+                    }
                     document.getElementById('task-time').value = task.time || '';
                     document.getElementById('task-priority').value = task.priority || 'Medium';
                     const rem_dt = task.reminder_datetime || '';
