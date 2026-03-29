@@ -1,3 +1,9 @@
+<!--
+1.python -m http.server using this comment on a cmd opend on a floder you can start a surver of that floder which allows you to run html files in that folder thourgh server.so that you can connect to wifi and use saparate chorme memory
+after running this in cmd got to chrome and type http://localhost:8000/file_name.html
+for LAN:python -m http.server 8000 --bind 0.0.0.0 and then http://192.168.29.100:8000/file_name.html
+2.chrome gives a little bit of memory to store website data which is enough for text storing.see the example of task manager single file
+-->
 <!DOCTYPE html>
 <html lang="en">
 
@@ -733,7 +739,8 @@ td:last-child {
     border: 2px solid rgba(71, 85, 105, 0.6);
     border-radius: 6px;
     cursor: pointer;
-    display: flex;
+    display: inline-flex;
+    margin: 0 auto;
     align-items: center;
     justify-content: center;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -1115,9 +1122,6 @@ td:last-child {
             <div class="header-top"
                 style="position: relative; z-index: 10; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
                 <div class="brand" style="display: flex; align-items: center; gap: 20px;">
-                    <div class="logo-icon"
-                        style="width: 55px; height: 55px; background: rgba(255,255,255,0.25); backdrop-filter: blur(10px); border-radius: 16px; display: flex; justify-content: center; align-items: center; color: white; font-size: 1.8rem; box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15); border: 1px solid rgba(255,255,255,0.4);">
-                        <i class="fas fa-tasks"></i></div>
                     <div style="display: flex; flex-direction: column;">
                         <h1 class="brand-title"
                             style="font-size: 2.2rem; font-weight: 800; color: white; margin: 0; line-height: 1.1; letter-spacing: -1px; text-shadow: 0 4px 15px rgba(0,0,0,0.1);">
@@ -1163,6 +1167,9 @@ td:last-child {
                         </button>
                         <button id="reset-account-btn" class="drop-item del" style="color: #ef4444; font-weight: bold;">
                             <i class="fas fa-skull-crossbones" style="width: 20px;"></i> Reset Account
+                        </button>
+                        <button id="delete-account-btn" class="drop-item del" style="color: #ef4444; font-weight: bold;">
+                            <i class="fas fa-user-times" style="width: 20px;"></i> Delete Account
                         </button>
                         <hr style="margin: 8px 0; border: 0; border-top: 1px solid var(--border-color);">
                         <button id="logout-btn" class="drop-item del">
@@ -1489,13 +1496,6 @@ initDB();
 const getDB = () => JSON.parse(localStorage.getItem(DB_KEY));
 const saveDB = (db) => localStorage.setItem(DB_KEY, JSON.stringify(db));
 
-const hashPassword = async (password) => {
-    const msgBuffer = new TextEncoder().encode(password);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-};
-
 const originalFetch = window.fetch;
 window.fetch = async (url, options = {}) => {
     const db = getDB();
@@ -1522,18 +1522,23 @@ window.fetch = async (url, options = {}) => {
     }
     if (url === '/api/auth/login') {
         const u = bodyObj.username.toLowerCase();
-        const p = await hashPassword(bodyObj.password);
+        const p = bodyObj.password;
+
+        const msgBuffer = new TextEncoder().encode(p);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashedP = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
         if (!db.users[u]) {
             // New user registration
-            db.users[u] = { password: p, settings: { morning_notify: true }, tasks: [], progress: [], non_daily_tasks: [], nextTaskId: 1, nextProgressId: 1, nextNdId: 1 };
+            db.users[u] = { password: hashedP, settings: { morning_notify: true }, tasks: [], progress: [], non_daily_tasks: [], nextTaskId: 1, nextProgressId: 1, nextNdId: 1 };
             saveDB(db);
         } else {
-            // Check if existing password is plain text (not 64 chars long or matches input directly)
-            if (db.users[u].password !== p && db.users[u].password === bodyObj.password) {
-                // Upgrade to hashed password
-                db.users[u].password = p;
+            // Migration for existing plain-text passwords
+            if (db.users[u].password === p) {
+                db.users[u].password = hashedP;
                 saveDB(db);
-            } else if (db.users[u].password !== p) {
+            } else if (db.users[u].password !== hashedP) {
                 return jsonRes({ error: 'Invalid credentials. If you are trying to create a new account, this password is already in use!' }, 401);
             }
         }
@@ -1629,6 +1634,13 @@ window.fetch = async (url, options = {}) => {
         saveDB(db);
         return jsonRes({ success: true });
     }
+
+    if (url === '/api/account/delete' && method === 'DELETE') {
+        delete db.users[currentUser];
+        saveDB(db);
+        sessionStorage.removeItem('currentUser');
+        return jsonRes({ success: true });
+    }
     
     if (url === '/api/account/username' && method === 'POST') {
         if (!bodyObj.username) return jsonRes({error: 'Username required'}, 400);
@@ -1640,7 +1652,10 @@ window.fetch = async (url, options = {}) => {
     }
     
     if (url === '/api/account/password' && method === 'POST') {
-        user.password = await hashPassword(bodyObj.password);
+        const msgBuffer = new TextEncoder().encode(bodyObj.password);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        user.password = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
         saveDB(db);
         return jsonRes({ success: true });
     }
@@ -2060,8 +2075,9 @@ document.addEventListener('DOMContentLoaded', () => {
             totalCompletionPoints += taskCompletedDays;
             totalPossiblePoints += taskValidDays;
 
-            // Mark task visually as completed if 100%
-            if (taskProgressPercent === 100 && taskValidDays > 0) tr.classList.add('completed-task');
+            // Mark task visually as completed if 100% or if completed today
+            const isTodayCompleted = allProgress.some(x => x.task_id === task.id && x.date === todayStr && x.status === 1);
+            if ((taskProgressPercent === 100 && taskValidDays > 0) || isTodayCompleted) tr.classList.add('completed-task');
 
             let rowHtml = `
                 <td class="actions-cell">
@@ -2191,6 +2207,23 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('del-works-btn')?.addEventListener('click', () => accAction('works', 'Delete all works?', 'All works deleted'));
     document.getElementById('reset-progress-btn')?.addEventListener('click', () => accAction('progress', 'Reset all tracking progress?', 'Progress reset'));
     document.getElementById('reset-account-btn')?.addEventListener('click', () => accAction('all', 'WARNING: Reset entire account? This deletes all your data forever.', 'Account completely reset'));
+
+    document.getElementById('delete-account-btn')?.addEventListener('click', async () => {
+        if (!confirm('DANGER: Are you sure you want to permanently DELETE your account? This action cannot be undone and your login will be removed from Chrome storage.')) return;
+        try {
+            const res = await fetch('/api/account/delete', { method: 'DELETE' });
+            if (res.ok) {
+                currentUser = null;
+                showLogin();
+                showToast('Account deleted successfully', 'success');
+            } else {
+                showToast('Failed to delete account', 'error');
+            }
+        } catch (e) {
+            showToast('Action failed', 'error');
+        }
+        document.getElementById('settings-dropdown').classList.remove('show');
+    });
 
     document.getElementById('change-username-btn')?.addEventListener('click', () => {
         document.getElementById('settings-dropdown').classList.remove('show');
