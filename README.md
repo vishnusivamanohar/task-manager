@@ -1,117 +1,78 @@
-# RAG Projects: Simple & Advanced Retrieval-Augmented Generation
+# Task Manager Application Report
 
-This repository contains two implementations of Retrieval-Augmented Generation (RAG) systems. It demonstrates the journey from a simple dictionary-based retrieval mechanism to a production-grade RAG pipeline featuring a local vector database, multi-query expansion, and a responsive Flask web application.
-
----
-
-## 🌟 Features
-
-### 21. Real RAG with ChromaDB (`rag project.py` & `rag_project_notebook.ipynb`)
-A fully-featured RAG system representing a customer support assistant for **Royal Spice Restaurant (Hyderabad)**.
-* **Document Ingestion**: Loads restaurant details (menus, pricing, hours, policies) from `knowledge_base.txt`.
-* **Text Chunking**: Splits documents into digestible segments using LangChain's `CharacterTextSplitter` (configured with a chunk size of 300 and overlap of 60).
-* **Dense Embeddings**: Creates vector embeddings using the `sentence-transformers/all-MiniLM-L6-v2` model.
-* **Vector Storage**: Indexes and persists embeddings locally in a `chroma_db` directory.
-* **Multi-Query Retrieval (Sub-Questions)**: Generates 2-3 alternative search queries from the user input to ensure robust context retrieval (combats keyword-matching limitations).
-* **Deduplication & Capping**: Aggregates, deduplicates, and limits retrieved chunks to the top 5 to keep context precise and cost-effective.
-* **CLI Chat Interface**: Interactive terminal loop that highlights the generated sub-questions, retrieved source chunks, and model responses in color-coded output.
-
-### 2. Flask Web Interface (`app.py` & `templates/index.html`)
-A beautiful, modern web-based chatbot for the Royal Spice Restaurant.
-* **Flask Server**: Hosts a lightweight backend, dynamically imports the RAG logic, and exposes APIs for processing chat exchanges.
-* **Modern UI**: Features a dark-themed glassmorphism interface styled with custom fonts (Inter) and font-awesome icons.
-* **Text-to-Speech (TTS)**: Built-in voice synthesis allowing users to listen to the chatbot's responses. Features custom controls that automatically prioritize female English voices and accelerate speech for natural listening.
-* **UX Enhancements**: Includes responsive layouts (mobile-friendly), typing indicator animations, and smooth auto-scrolling.
+## Executive Overview
+The Task Manager is a full-stack, Flask-powered productivity dashboard designed for elegant, fast-paced task management. Built with a responsive "glassmorphism" design language, the app features dynamic Daily Task Tracking, asynchronous UI experiences via embedded JavaScript, and robust security patterns.
 
 ---
 
-## 🛠️ Tech Stack
+## Database Architecture
+The backend strictly leverages a local SQLite3 database enforcing schema normalization across 4 primary tables.
 
-* **Core Language**: Python 3.10+
-* **LLM API Provider**: [Groq Cloud](https://console.groq.com/) (using `llama-3.3-70b-versatile`)
-* **RAG Framework**: LangChain
-* **Vector Database**: ChromaDB
-* **Embeddings**: HuggingFace Sentence Transformers (`all-MiniLM-L6-v2`)
-* **Web Server**: Flask (Python)
-* **Frontend**: HTML5, CSS3 (Vanilla), JavaScript (Vanilla)
+1. users Table (Auth & Options)
+Acts as the central entity layer ensuring multi-tenant capabilities.
+* id (INTEGER PRIMARY KEY)
+* username (TEXT): Non-unique and case-insensitive to allow flexible name mapping.
+* password (TEXT): Werkzeug cryptographic hashes. Acts as the universally unique identity key for each account.
+* morning_notify (BOOLEAN): Toggles the generation of OS-level reminder popups.
 
----
+2. tasks Table (Routines)
+Stores configurations for habitual workflow.
+* id (INTEGER PRIMARY KEY)
+* user_id (INTEGER): Foreign Key linking to the users table.
+* title (TEXT) & description (TEXT)
+* priority (TEXT): Categorical tags (High, Medium, Low).
+* start_date (TEXT), end_date (TEXT), time (TEXT)
 
-## 📂 Directory Structure
+3. task_progress Table (Daily State)
+A granular tracking table that records a row for each intersection of Date + Task.
+* id (INTEGER PRIMARY KEY)
+* task_id (INTEGER)
+* user_id (INTEGER)
+* date (TEXT): Stored as locally-derived YYYY-MM-DD timestamps avoiding UTC shift-bugs.
+* status (INTEGER): Binary toggle (0 for unchecked, 1 for completed).
 
-```text
-rag projects/
-│
-├── chroma_db/                  # Local directory for persisted Chroma vector store
-├── templates/
-│   └── index.html              # Frontend UI for the Flask web application
-├── .env                        # Environment file containing credentials (API keys)
-├── app.py                      # Flask web application entry point
-├── knowledge_base.txt          # Raw text data source containing Royal Spice details
-├── rag project.py              # Real RAG implementation with multi-query logic
-
-```
-
----
-
-## 🚀 Setup & Installation
-
-
-### 1. Install Dependencies
-Make sure you have Python installed. You can install all necessary packages via `pip`:
-```bash
-pip install langchain langchain-community langchain-huggingface langchain-chroma chromadb langchain-groq sentence-transformers python-dotenv flask
-```
-
-### 3. Configure Environment Variables
-Create a file named `.env` in the root directory (if it doesn't already exist) and add your Groq  API key (it is a free source):
-```env
-GROQ_API_KEY=your_actual_groq_api_key_here
-```
-*You can get a free API key from the [Groq Console](https://console.groq.com/).*
+4. non_daily_tasks Table (To-Dos)
+Standard single-purpose task bin.
+* id (INTEGER PRIMARY KEY)
+* user_id (INTEGER)
+* title (TEXT)
+* date (TEXT): A target fulfillment deadline.
 
 ---
 
-## 🎮 How to Run
+## Core Modules & Capabilities
 
-### Run the RAG CLI (Restaurant Chatbot)
-Launch the console-based vector store RAG application:
-```bash
-python "rag project.py"
-```
-*Try asking: `"which is cheaper, chicken biryani or mutton biryani?"` or `"Is rooftop dining available today?"`*
+Fluid Client/Server Asynchrony
+All modifications made by the user, ranging from ticking off a task to altering account themes, are routed quietly through fetch() API routes. This allows script.js to instantly rewrite the DOM arrays dynamically without requiring the user to reload the page.
+
+Daily Tracking & Streak Algorithms
+The Daily Tracker renders a rolling window of history (up to the last 7 days + today). The JavaScript engine loops backward through the allProgress JSON dictionary to calculate contiguous active progress arrays mathematically, driving the Active Streak multiplier. The completion fractions are aggregated and pumped straight into dynamic Chart.js arcs (the Speedometer).
+
+Master Key Authentication
+Because usernames are permitted to collide (e.g., several users named "Jane"), the server enforces strict validation checks evaluating the hashed password. A user is seamlessly instantiated a completely new workspace instance merely by attempting a novel password combination.
+
+Account Management & Resets
+The Settings menu provides robust lifecycle options, allowing users granular control over their workspace containing protective confirmation prompts:
+* Change Username/Password: Custom modals allow users to instantly and asynchronously modify their display name and unique login password. Changes auto-update across the dashboard in real-time.
+* Delete Tasks/Works: Specific buttons allow users to wipe their recurring Daily Tasks or one-off Works without impacting their historical tracking data.
+* Reset Progress: A powerful tool to purge all checked history, reverting the Active Streak and Speedometers to 0%, while preserving the task templates.
+* Reset Account: The "Nuclear Option" invokes a backend command to purge the user's footprint entirely from tasks, non_daily_tasks, and task_progress, yielding a completely fresh state.
+
+Dynamic Filtering & Searching
+* Live Search: Users can type into the omnipresent search bar to instantly query their task titles and descriptions. The JavaScript array filter() executes live keystroke matching without page reloads.
+* Priority Selection: A dropdown filters the Daily Tracker down to specifically tagged priorities (High, Medium, Low), enabling focused execution during heavy workload days.
 
 ---
 
-### Run the Web Chatbot Application
-Launch the Flask development server:
-```bash
-python app.py
-```
-1. Open your browser and go to `http://127.0.0.1:5000/`.
-2. Interact with the chat interface.
-3. Click the volume icon 🔊 on any message to trigger the Text-to-Speech assistant speaker.
+## Interface Layout Strategy
 
----
+1. The Header
+Responsive toolbar bundling the Theme switch, Priority isolated-dropdown, and deep-search filter arrays together.
 
-## 🔍 How the RAG Pipeline Works
+2. Tracking Matrix
+A massive horizontal sequence grid providing an overview over the trailing week's completion data. Older tasks are natively suspended/disabled from tampering.
 
-```mermaid
-flowchart TD
-    UserQ[User Question] --> MultiQ[LLM Sub-Question Generator]
-    MultiQ -->|Original + 2 Sub-Q| Queries[List of 3 Queries]
-    Queries --> Embedding[Sentence-Transformers Encoder]
-    Embedding --> Search[Chroma DB Vector Search]
-    Search -->|Top 3 chunks per query| Merged[Deduplicated & Merged Chunks]
-    Merged -->|Cap to Max 5 chunks| Context[Context Block]
-    Context --> SystemPrompt[LLM Grounding Prompt]
-    UserQ --> SystemPrompt
-    SystemPrompt --> GroqLLM[llama-3.3-70b-versatile]
-    GroqLLM --> Output[Final Grounded Answer]
-```
-
-1. **Sub-Question Generation**: When a user inputs a query like `"Is the restaurant open and do you have biryani?"`, the system generates sub-queries (`"What are the working hours?"`, `"Do you serve biryani?"`).
-2. **Multi-Query Vector Retrieval**: The system generates embeddings for all 3 queries and searches the Chroma database.
-3. **Deduplication**: Since queries overlap, similar results are returned. Chunks are deduplicated by content to conserve token budget.
-4. **Context Injection**: Chunks are merged into a single block of context and injected into the LLM system prompt.
-5. **Grounded Generation**: The LLM responds to the user query using *only* the retrieved context, maintaining conversation memory.
+3. Bottom Sections Layer
+* Dashboard Stats: A flexible left-bound panel holding the live completion rates and streak integers.
+* Works to Reminder: A scroll-managed bounding box capturing independent target tasks.
+* Mobile Response: Transitions perfectly using viewport cascading, snapping the Statistics panel underneath the independent tasks for optimal scroll paths.
